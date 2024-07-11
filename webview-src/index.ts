@@ -211,7 +211,7 @@ class Serialport {
       if (!this.options.portName) {
         return Promise.reject(`Port name can not be empty!`);
       }
-      if (!this.options.baudRate) {
+      if (this.options.baudRate === undefined) {
         return Promise.reject(`BaudRate can not be empty!`);
       }
       if (this.isOpen) {
