@@ -313,7 +313,7 @@ pub fn write<R: Runtime>(
     value: String,
 ) -> Result<usize, Err> {
     get_serialport(state, port_name.clone(), |serialport_info| {
-        match serialport_info.serialport.write(value.as_bytes()) {
+    match serialport_info.serialport.write(value.as_bytes()) {
             Ok(size) => {
                 Ok(size)
         }
@@ -335,18 +335,26 @@ pub fn write_binary<R: Runtime>(
     port_name: String,
     value: Vec<u8>,
 ) -> Result<usize, Err> {
-    get_serialport(state, port_name.clone(), |serialport_info| match serialport_info
-        .serialport
-        .write(&value)
-    {
-        Ok(size) => {
-            Ok(size)
-        }
-        Err(error) => {
-            Err(Err::String(format!(
+    get_serialport(state, port_name.clone(), |serialport_info| {
+        // Obtain a mutable reference to the trait object
+        let serialport = &mut *serialport_info.serialport;
+        std::thread::sleep(Duration::from_millis(50));
+        // Try to write all data
+        match serialport.write_all(&value.as_slice()) {
+            Ok(()) => {
+                // Flush the serial port to ensure all data is sent
+                match serialport.flush() {
+                    Ok(()) => Ok(value.len()), // Return the number of bytes written
+                    Err(error) => Err(Err::String(format!(
+                        "Flush after writing to serial port: {} failed: {}",
+                        &port_name, error
+                    ))),
+                }
+            }
+            Err(error) => Err(Err::String(format!(
                 "Write to serial port: {} failed: {}",
                 &port_name, error
-            )))
+            ))),
         }
     })
 }
