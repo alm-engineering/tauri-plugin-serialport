@@ -11,4 +11,4 @@ exclude = ["/examples", "/webview-dist", "/webview-src", "node_modules"]
 tauri = { version = "1.5.0" }
 serde = "1.0"
 thiserror = "1.0"
-serialport = "4.3.0"
+serialport = "4.5.0"
