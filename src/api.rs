@@ -6,6 +6,40 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::thread;
 use std::time::Duration;
 use tauri::{command, AppHandle, Runtime, State, Window};
+use std::vec::Vec;
+
+
+
+use lazy_static::lazy_static; // Import the lazy_static macro
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref GLOBAL_DATA: Mutex<[u8; 12]> = Mutex::new([0; 12]);
+    static ref GLOBAL_DATA_SET: Mutex<bool> = Mutex::new(false); // Flag to track if data has been set
+}
+
+// Function to write to the global array and mark it as set
+fn write_to_global_data(data: [u8; 12]) {
+    let mut global_data = GLOBAL_DATA.lock().unwrap(); // Lock the mutex to safely access the array
+    *global_data = data;
+
+    let mut global_data_set = GLOBAL_DATA_SET.lock().unwrap();
+    *global_data_set = true; // Mark the global data as set
+}
+
+// Function to read from the global array
+fn read_from_global_data() -> [u8; 12] {
+    let global_data = GLOBAL_DATA.lock().unwrap(); // Lock the mutex to safely access the array
+    *global_data
+}
+
+// Function to check if the global data has been set
+fn is_global_data_set() -> bool {
+    let global_data_set = GLOBAL_DATA_SET.lock().unwrap();
+    *global_data_set
+}
+
+
 
 fn get_serialport<T, F: FnOnce(&mut SerialPortInfo) -> Result<T, Err>>(
     state: State<'_, SerialPortState>,
@@ -15,11 +49,12 @@ fn get_serialport<T, F: FnOnce(&mut SerialPortInfo) -> Result<T, Err>>(
     match state.serialports.lock() {
         Ok(mut map) => match map.get_mut(&port_name) {
             Some(serialport_info) => f(serialport_info),
-            None => {
-                Err(Err::String("Serial Port not found!".to_string()))
-            }
+            None => Err(Err::String("Serial Port not found!".to_string())),
         },
-        Err(error) =>  Err(Err::String(format!("Failed to acquire file lock! {} ", error))),
+        Err(error) => Err(Err::String(format!(
+            "Failed to acquire file lock! {} ",
+            error
+        ))),
     }
 }
 
@@ -99,7 +134,10 @@ pub async fn cancel_read<R: Runtime>(
             Some(sender) => match sender.send(1) {
                 Ok(_) => {}
                 Err(error) => {
-                    return Err(Err::String(format!("Failed to cancel serial port reading data: {}", error)));
+                    return Err(Err::String(format!(
+                        "Failed to cancel serial port reading data: {}",
+                        error
+                    )));
                 }
             },
             None => {}
@@ -122,12 +160,13 @@ pub fn close<R: Runtime>(
             if serialports.remove(&port_name).is_some() {
                 Ok(())
             } else {
-                Err(Err::String(format!("Serial port {} not opened!", &port_name)))
+                Err(Err::String(format!(
+                    "Serial port {} not opened!",
+                    &port_name
+                )))
             }
         }
-        Err(error) => {
-            Err(Err::String(format!("Failed to acquire lock: {}", error)))
-        }
+        Err(error) => Err(Err::String(format!("Failed to acquire lock: {}", error))),
     }
 }
 
@@ -145,7 +184,10 @@ pub fn close_all<R: Runtime>(
                         Ok(_) => {}
                         Err(error) => {
                             println!("Failed to cancel serial port reading data: {}", error);
-                            return Err(Err::String(format!("Failed to cancel serial port reading data: {}", error)));
+                            return Err(Err::String(format!(
+                                "Failed to cancel serial port reading data: {}",
+                                error
+                            )));
                         }
                     }
                 }
@@ -153,9 +195,7 @@ pub fn close_all<R: Runtime>(
             map.clear();
             Ok(())
         }
-        Err(error) => {
-            Err(Err::String(format!("Failed to acquire lock: {}", error)))
-        }
+        Err(error) => Err(Err::String(format!("Failed to acquire lock: {}", error))),
     }
 }
 
@@ -174,7 +214,10 @@ pub fn force_close<R: Runtime>(
                         Ok(_) => {}
                         Err(error) => {
                             println!("Failed to cancel serial port reading data: {}", error);
-                            return Err(Err::String(format!("Failed to cancel serial port reading data: {}", error)));
+                            return Err(Err::String(format!(
+                                "Failed to cancel serial port reading data: {}",
+                                error
+                            )));
                         }
                     }
                 }
@@ -184,9 +227,7 @@ pub fn force_close<R: Runtime>(
                 Ok(())
             }
         }
-        Err(error) => {
-            Err(Err::String(format!("Failed to acquire lock: {}", error)))
-        }
+        Err(error) => Err(Err::String(format!("Failed to acquire lock: {}", error))),
     }
 }
 
@@ -206,7 +247,10 @@ pub fn open<R: Runtime>(
     match state.serialports.lock() {
         Ok(mut serialports) => {
             if serialports.contains_key(&port_name) {
-                return Err(Err::String(format!("Serial port {} not opened!", port_name)));
+                return Err(Err::String(format!(
+                    "Serial port {} not opened!",
+                    port_name
+                )));
             }
             match serialport::new(port_name.clone(), baud_rate)
                 .data_bits(get_data_bits(data_bits))
@@ -220,21 +264,33 @@ pub fn open<R: Runtime>(
                     let data = SerialPortInfo {
                         serialport: serial,
                         sender: None,
+                        button: Some(0)
                     };
                     serialports.insert(port_name, data);
                     Ok(())
                 }
                 Err(error) => Err(Err::String(format!(
                     "Access serial port {} failed: {}",
-                    port_name,
-                    error.description
+                    port_name, error.description
                 ))),
             }
         }
-        Err(error) => {
-            Err(Err::String(format!("Failed to acquire lock: {}", error)))
-        }
+        Err(error) => Err(Err::String(format!("Failed to acquire lock: {}", error))),
     }
+}
+
+fn get_button_state(serial_port_state: &SerialPortState, port_name: &str) -> Option<u8> {
+    // Lock the mutex to get access to the HashMap
+    let lock = serial_port_state.serialports.lock().unwrap();
+    
+    // Try to get the SerialPortInfo for the specified port_name
+    if let Some(port_info) = lock.get(port_name) {
+        // Return the button state if it exists
+        return port_info.button;
+    }
+
+    // Return None if the port_name was not found
+    None
 }
 
 #[command]
@@ -274,7 +330,6 @@ pub fn read<R: Runtime>(
                         let mut serial_buf: Vec<u8> = vec![0; size.unwrap_or(1024)];
                         match serial.read(serial_buf.as_mut_slice()) {
                             Ok(size) => {
-                                println!("Serial port: {} Read data size: {}", &port_name, size);
                                 match window.emit(
                                     &read_event,
                                     ReadData {
@@ -282,21 +337,29 @@ pub fn read<R: Runtime>(
                                         size,
                                     },
                                 ) {
-                                    Ok(_) => {}
+                                    Ok(_) => {
+                                        // Only send global data if it was set at least once
+                                        if is_global_data_set() {
+                                            
+                                            let frame: [u8; 12] = read_from_global_data();
+                                            serial.write_all(&frame).expect("Failed to write frame");
+                                        }
+                                    }
                                     Err(error) => {
                                         println!("Failed to send data: {}", error)
                                     }
                                 }
                             }
-                            Err(_err) => {
-                                
-                            }
+                            Err(_err) => {}
                         }
                         thread::sleep(Duration::from_millis(timeout.unwrap_or(200)));
                     });
                 }
                 Err(error) => {
-                    return Err(Err::String(format!("Reading from {} failed: {}", &port_name, error)));
+                    return Err(Err::String(format!(
+                        "Reading from {} failed: {}",
+                        &port_name, error
+                    )));
                 }
             }
             Ok(())
@@ -312,19 +375,17 @@ pub fn write<R: Runtime>(
     port_name: String,
     value: String,
 ) -> Result<usize, Err> {
-    get_serialport(state, port_name.clone(), |serialport_info| {
-    match serialport_info.serialport.write(value.as_bytes()) {
-            Ok(size) => {
-                Ok(size)
-        }
-            Err(error) => {
-                Err(Err::String(format!(
-                    "Write to serial port: {} failed: {}",
-                    &port_name, error
-                )))
-            }
-        }
-    })
+    get_serialport(
+        state,
+        port_name.clone(),
+        |serialport_info| match serialport_info.serialport.write(value.as_bytes()) {
+            Ok(size) => Ok(size),
+            Err(error) => Err(Err::String(format!(
+                "Write to serial port: {} failed: {}",
+                &port_name, error
+            ))),
+        },
+    )
 }
 
 #[command]
@@ -358,3 +419,16 @@ pub fn write_binary<R: Runtime>(
         }
     })
 }
+
+#[command]
+pub fn set_frame<R: Runtime>(
+    _app: AppHandle<R>,
+    _window: Window<R>,
+    state: State<'_, SerialPortState>,
+    frame: [u8; 12],
+) {
+   println!("frame changed to");
+   println!("{:?}", frame);
+    write_to_global_data(frame);
+}
+

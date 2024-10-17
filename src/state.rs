@@ -13,6 +13,7 @@ pub struct SerialPortState {
 pub struct SerialPortInfo {
     pub serialport: Box<dyn SerialPort>,
     pub sender: Option<Sender<usize>>,
+    pub button: Option<u8>,
 }
 
 #[derive(Serialize, Clone)]

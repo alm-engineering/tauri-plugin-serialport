@@ -337,6 +337,30 @@ class Serialport {
       return Promise.reject(error);
     }
   }
+
+  /**
+   * @description: sets the data frame to response every message
+   * @param {Uint8Array} value
+   * @return {Promise<number>}
+   */
+  async setResponseFrame(value: Uint8Array | number[]): Promise<number> {
+    try {
+      if (!this.isOpen) {
+        return Promise.reject(`Serial port ${this.options.portName} not opened!`);
+      }
+      if (value instanceof Uint8Array || value instanceof Array) {
+        return await invoke("plugin:serialport|set_frame", {
+          frame: value,
+        });
+      } else {
+        return Promise.reject(
+          'value type not admitted! Expected type: string, Uint8Array, number[]',
+        );
+      }
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
 }
 
 export { Serialport };
