@@ -119,5 +119,11 @@ declare class Serialport {
      * @return {Promise<number>}
      */
     writeBinary(value: Uint8Array | number[]): Promise<number>;
+    /**
+     * @description: sets the data frame to response every message
+     * @param {Uint8Array} value
+     * @return {Promise<number>}
+     */
+    setResponseFrame(value: Uint8Array | number[]): Promise<number>;
 }
 export { Serialport };

@@ -23,6 +23,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       read,
       write,
       write_binary,
+      set_frame
     ])
     .setup(move |app| {
       app.manage(SerialPortState {
