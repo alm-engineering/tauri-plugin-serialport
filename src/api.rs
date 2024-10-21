@@ -263,8 +263,7 @@ pub fn open<R: Runtime>(
                 Ok(serial) => {
                     let data = SerialPortInfo {
                         serialport: serial,
-                        sender: None,
-                        button: Some(0)
+                        sender: None
                     };
                     serialports.insert(port_name, data);
                     Ok(())
@@ -279,19 +278,7 @@ pub fn open<R: Runtime>(
     }
 }
 
-fn get_button_state(serial_port_state: &SerialPortState, port_name: &str) -> Option<u8> {
-    // Lock the mutex to get access to the HashMap
-    let lock = serial_port_state.serialports.lock().unwrap();
-    
-    // Try to get the SerialPortInfo for the specified port_name
-    if let Some(port_info) = lock.get(port_name) {
-        // Return the button state if it exists
-        return port_info.button;
-    }
 
-    // Return None if the port_name was not found
-    None
-}
 
 #[command]
 pub fn read<R: Runtime>(
