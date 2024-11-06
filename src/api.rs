@@ -327,7 +327,7 @@ pub fn read<R: Runtime>(
                                     Ok(_) => {
                                         // Only send global data if it was set at least once
                                         if is_global_data_set() {
-                                            
+                                            thread::sleep(Duration::from_millis(30));
                                             let frame: [u8; 12] = read_from_global_data();
                                             serial.write_all(&frame).expect("Failed to write frame");
                                         }
